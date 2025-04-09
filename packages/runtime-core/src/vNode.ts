@@ -8,7 +8,7 @@ import {
 	VNodeTypes
 } from '../types'
 import { VNodeComponentSlots } from './../types.d'
-import { ShapeFlags, VNodeFlags } from './constants'
+import { PatchFlags, ShapeFlags, VNodeFlags } from './constants'
 
 /**
  * 创建虚拟节点
@@ -21,9 +21,10 @@ import { ShapeFlags, VNodeFlags } from './constants'
 export function createVNode<NODE, PROPS extends VNodeProps>(
 	type: VNodeTypes<NODE, PROPS>,
 	props?: VNodePropsPublic<PROPS>,
-	children?: VNodeChildren<NODE, PROPS>
+	children?: VNodeChildren<NODE, PROPS>,
+	patchFlag?: PatchFlags
 ) {
-	return new VNode<NODE, PROPS>(type, props, children)
+	return new VNode<NODE, PROPS>(type, props, children, patchFlag)
 }
 
 /**
@@ -44,19 +45,28 @@ export class VNode<NODE, PROPS extends VNodeProps> {
 
 	public props: PROPS | null = null
 
-	// 子级
+	// 子级 - 静态
 	public children: string | VNode<NODE, PROPS>[] | VNodeComponentSlots<NODE, PROPS> | null = null
+
+	// 子级 - 动态
+	public dynamicChildren: VNode<NODE, PROPS>[] | null = null
+
+	// 参数 - 动态
+	public dynamicProps: string[] | null = null
 
 	// 组件
 	public component: VNodeComponentInstance<NODE, PROPS> | null = null
 
-	// 默认为元素
+	// 形状类型，默认为元素
 	public shapeFlag: number = ShapeFlags.ELEMENT
 
 	constructor(
+		// 节点类型
 		public type: VNodeTypes<NODE, PROPS>,
 		props?: VNodePropsPublic<PROPS>,
-		children?: string | VNodeChildren<NODE, PROPS>
+		children?: string | VNodeChildren<NODE, PROPS>,
+		// 靶向类型，默认为动态
+		public patchFlag: PatchFlags = PatchFlags.BAIL
 	) {
 		// 组件
 		if (isObject(type)) {

@@ -5,6 +5,7 @@
 
 export { VNodeFlags } from './constants'
 
+export * from './block'
 export * from './h'
 export * from './renderer'
 

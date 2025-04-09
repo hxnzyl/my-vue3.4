@@ -1,4 +1,5 @@
 import { isSameObject } from '@vue3/shared'
+import { PatchPropKey } from 'packages/runtime-dom/src/constants'
 import { RendererOptions, VNodeComponentInstance, VNodeComponentType, VNodeProps } from '../types'
 import {
 	createComponentInstance,
@@ -7,7 +8,7 @@ import {
 	initComponentMethods,
 	initComponentProps
 } from './component'
-import { ShapeFlags, VNodeFlags } from './constants'
+import { PatchFlags, ShapeFlags, VNodeFlags } from './constants'
 import { getSequence } from './seq'
 import { VNode } from './vNode'
 
@@ -38,20 +39,7 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 				delete container[VNodeFlags.Node]
 			}
 		} else {
-			// container 中挂载一个 vNode
-			// @ts-ignore
-			// 虚拟节点都相同都不需要补丁
-			if (oldVNode == null) {
-				// 老的没有则是初始化
-				this.mount(container, newVNode)
-			} else if (this.isSameNode(newVNode, oldVNode)) {
-				// 节点相同则挂载元素
-				this.patch(newVNode, oldVNode)
-			} else {
-				// type 不一样 或 key 不一样
-				this.unmount(oldVNode)
-				this.mount(container, newVNode)
-			}
+			this.patchIf(container, newVNode, oldVNode)
 			// @ts-ignore
 			container[VNodeFlags.Node] = newVNode
 		}
@@ -75,12 +63,7 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 	 * @param newVNode
 	 * @param anchor
 	 */
-	mount(
-		container: NODE,
-		newVNode: VNode<NODE, PROPS>,
-		anchor?: NODE | null,
-		parentComponent?: VNodeComponentInstance<NODE, PROPS> | null
-	) {
+	mount(container: NODE, newVNode: VNode<NODE, PROPS>, anchor?: NODE | null) {
 		let el = newVNode.el,
 			init = !el
 		if (newVNode.type == VNodeFlags.TextNode) {
@@ -92,7 +75,7 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 			// Fragment
 			el || (el = newVNode.el = this._options.createFragment())
 			// 挂载数组
-			this.mountChildren(el, newVNode.children as VNode<NODE, PROPS>[], anchor, parentComponent)
+			this.mountChildren(el, newVNode.children as VNode<NODE, PROPS>[], anchor)
 		} else if (newVNode.shapeFlag & ShapeFlags.COMPONENT) {
 			// Component
 			this.mountComponent(container, newVNode, anchor)
@@ -107,7 +90,7 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 			}
 			// 挂载数组
 			else if (newVNode.shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-				this.mountChildren(el, newVNode.children as VNode<NODE, PROPS>[], anchor, parentComponent)
+				this.mountChildren(el, newVNode.children as VNode<NODE, PROPS>[], anchor)
 			}
 		}
 		// 如果是 Component 时，需要等 mounted 之后才会挂载
@@ -138,13 +121,13 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 	/**
 	 * 挂载props
 	 *
-	 * @param container
+	 * @param el
 	 * @param newVNode
 	 */
-	mountProps(container: NODE, newVNode: VNode<NODE, PROPS>) {
+	mountProps(el: NODE, newVNode: VNode<NODE, PROPS>) {
 		if (newVNode.props != null) {
 			for (let key in newVNode.props) {
-				this._options.patchProp(container, key, newVNode.props[key], null)
+				this._options.patchProp(el, key, newVNode.props[key], null)
 			}
 		}
 	}
@@ -152,17 +135,12 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 	/**
 	 * 挂载子节点
 	 *
-	 * @param container
+	 * @param el
 	 * @param children
 	 */
-	mountChildren(
-		container: NODE,
-		children: VNode<NODE, PROPS>[],
-		anchor?: NODE | null,
-		parentComponent?: VNodeComponentInstance<NODE, PROPS> | null
-	) {
+	mountChildren(el: NODE, children: VNode<NODE, PROPS>[], anchor?: NODE | null) {
 		for (let i = 0, l = children.length; i < l; i++) {
-			this.mount(container, children[i], anchor, parentComponent)
+			this.mount(el, children[i], anchor)
 		}
 	}
 
@@ -198,44 +176,61 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 	}
 
 	/**
-	 * 补丁
+	 * 补丁，与原实现不同
+	 * 这里只做补丁，不考虑oldVNode不存在的情况，因为我在patch之前都有判断
 	 *
 	 * @param newVNode
 	 * @param oldVNode
 	 * @param anchor
 	 * @param parentComponent
 	 */
-	patch(
-		newVNode: VNode<NODE, PROPS>,
-		oldVNode: VNode<NODE, PROPS>,
-		anchor?: NODE | null,
-		parentComponent?: VNodeComponentInstance<NODE, PROPS> | null
-	) {
-		// 新的复用老的元素
+	patch(newVNode: VNode<NODE, PROPS>, oldVNode: VNode<NODE, PROPS>, anchor?: NODE | null) {
+		// 复用元素
 		const el = (newVNode.el = oldVNode.el) as NODE
-		// 新的复用老的组件
+		// 复用组件
 		const component = (newVNode.component = oldVNode.component)
-		// 挂载属性
-		this.patchProps(el, newVNode, oldVNode, component, parentComponent)
-		// 挂载子级
-		this.patchChildren(el, newVNode, oldVNode, anchor, component, parentComponent)
+		// props diff
+		this.patchProps(el, newVNode, oldVNode, component)
+		// children diff
+		this.patchChildren(el, newVNode, oldVNode, anchor, component)
 	}
 
 	/**
-	 * props 补丁
+	 * 补丁，如果 oldVNode 不存在
 	 *
 	 * @param container
 	 * @param newVNode
 	 * @param oldVNode
+	 * @param anchor
+	 */
+	patchIf(container: NODE, newVNode: VNode<NODE, PROPS>, oldVNode?: VNode<NODE, PROPS> | null, anchor?: NODE | null) {
+		if (oldVNode == null) {
+			// 老的没有则是初始化
+			this.mount(container, newVNode, anchor)
+		} else if (this.isSameNode(newVNode, oldVNode)) {
+			// 节点相同则挂载元素
+			this.patch(newVNode, oldVNode, anchor)
+		} else {
+			// type 不一样 或 key 不一样
+			this.unmount(oldVNode)
+			this.mount(container, newVNode, anchor)
+		}
+	}
+
+	/**
+	 * 全量diff - props 补丁
+	 *
+	 * @param el
+	 * @param newVNode
+	 * @param oldVNode
 	 */
 	patchProps(
-		container: NODE,
+		el: NODE,
 		newVNode: VNode<NODE, PROPS>,
 		oldVNode: VNode<NODE, PROPS>,
-		component?: VNodeComponentInstance<NODE, PROPS> | null,
-		parentComponent?: VNodeComponentInstance<NODE, PROPS> | null
+		component?: VNodeComponentInstance<NODE, PROPS> | null
 	) {
-		const { props: newProps } = newVNode
+		const { props: newProps, dynamicProps, patchFlag } = newVNode
 		const { props: oldProps } = oldVNode
 
 		// props 一样
@@ -243,35 +238,173 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 			return
 		}
 
-		if (newProps != null) {
-			for (let key in newProps) {
-				this._options.patchProp(container, key, newProps[key], null, component)
+		if (patchFlag && newProps && oldProps && !(patchFlag & PatchFlags.FULL_PROPS)) {
+			// 靶向更新
+			this.patchBlockProps(el, patchFlag, dynamicProps, newProps, oldProps, component)
+		} else {
+			// 全量更新
+			if (newProps != null) {
+				for (let key in newProps) {
+					this._options.patchProp(el, key, newProps[key], null, component)
+				}
 			}
-		}
-
-		if (oldProps != null) {
-			for (let key in oldProps) {
-				if (!newProps || newProps[key] == null) {
-					this._options.patchProp(container, key, null, oldProps[key], component)
+			if (oldProps != null) {
+				for (let key in oldProps) {
+					if (!newProps || newProps[key] == null) {
+						this._options.patchProp(el, key, null, oldProps[key], component)
+					}
 				}
 			}
 		}
 	}
 
 	/**
-	 * 两个数组的全量 diff 算法（比较消耗性能）
+	 * 全量diff - children 补丁
 	 *
-	 * @param container
+	 * @param newVNode
+	 * @param oldVNode
+	 * @returns
+	 */
+	patchChildren(
+		el: NODE,
+		newVNode: VNode<NODE, PROPS>,
+		oldVNode: VNode<NODE, PROPS>,
+		anchor?: NODE | null,
+		component?: VNodeComponentInstance<NODE, PROPS> | null
+	) {
+		const { patchFlag, dynamicChildren } = newVNode
+		if (patchFlag && dynamicChildren && patchFlag & PatchFlags.STABLE_FRAGMENT) {
+			// 靶向更新
+			this.patchBlockChildren(el, dynamicChildren, oldVNode.dynamicChildren!, anchor)
+		} else {
+			// 全量更新
+
+			// shapeFlag 与 children 一样
+			const { shapeFlag: newShapeFlag, children: newChildren } = newVNode
+			const { shapeFlag: oldShapeFlag, children: oldChildren } = oldVNode
+			if (newShapeFlag === oldShapeFlag && isSameObject(newChildren, oldChildren)) {
+				return
+			}
+
+			const ops = this._options
+			if (newShapeFlag & ShapeFlags.TEXT_CHILDREN) {
+				// 新的是文本
+
+				if (oldShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+					// 新的是文本，老的是数组，卸载老的
+					this.unmountChildren(oldChildren as VNode<NODE, PROPS>[])
+				}
+
+				if (newChildren !== oldChildren) {
+					// 新的是文本，设置文本
+					ops.setElementText(el, newChildren as string)
+				}
+			} else if (oldShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+				// 老的是数组，新的是数组或空
+
+				if (newShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+					// 老的是数组，新的是数组，全量 diff 算法
+					this.patchKeyedChildren(
+						el,
+						newChildren as VNode<NODE, PROPS>[],
+						oldChildren as VNode<NODE, PROPS>[],
+						component
+					)
+					// 无 diff 算法
+					// 卸载老的
+					// this.unmountChildren(oldChildren as VNode<NODE, PROPS>[])
+					// 挂载新的
+					// this.mountChildren(el, newChildren as VNode<NODE, PROPS>[])
+				} else {
+					// 老的是数组，新的是空，卸载老的
+					this.unmountChildren(oldChildren as VNode<NODE, PROPS>[])
+				}
+			} else {
+				// 老的是文本或空，新的是数组或空
+
+				if (oldShapeFlag & ShapeFlags.TEXT_CHILDREN) {
+					// 老的是文本，新的是数组或空，清空文本
+					ops.setElementText(el, '')
+				}
+
+				if (newShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+					// 新的是数组，挂载新的
+					this.mountChildren(el, newChildren as VNode<NODE, PROPS>[], anchor, component)
+				}
+			}
+		}
+	}
+
+	/**
+	 * 线性diff - props 补丁
+	 *
+	 * @param el
 	 * @param newVNode
 	 * @param oldVNode
 	 */
-	patchKeyedChildren(
-		container: NODE,
-		newVNodes: VNode<NODE, PROPS>[],
-		oldVNodes: VNode<NODE, PROPS>[],
-		component?: VNodeComponentInstance<NODE, PROPS> | null,
-		parentComponent?: VNodeComponentInstance<NODE, PROPS> | null
+	patchBlockProps(
+		el: NODE,
+		patchFlag: PatchFlags,
+		dynamicProps: string[] | null,
+		newProps: PROPS,
+		oldProps: PROPS,
+		component?: VNodeComponentInstance<NODE, PROPS> | null
 	) {
+		const ops = this._options
+
+		// class
+		if (patchFlag & PatchFlags.CLASS) {
+			if (oldProps.class !== newProps.class) {
+				ops.patchProp(el, PatchPropKey.CLASS, null, newProps.class)
+			}
+		}
+
+		// style
+		if (patchFlag & PatchFlags.STYLE) {
+			if (oldProps.style !== newProps.style) {
+				ops.patchProp(el, PatchPropKey.STYLE, oldProps.style, newProps.style)
+			}
+		}
+
+		// props
+		if (dynamicProps && patchFlag & PatchFlags.PROPS) {
+			for (let i = 0, l = dynamicProps.length; i < l; i++) {
+				const key = dynamicProps[i]
+				const prev = oldProps[key]
+				const next = newProps[key]
+				if (next !== prev || key === 'value') {
+					ops.patchProp(el, key, prev, next, component)
+				}
+			}
+		}
+	}
+
+	/**
+	 * 线性diff - children 补丁
+	 *
+	 * @param newVNode
+	 * @param oldVNode
+	 * @returns
+	 */
+	patchBlockChildren(
+		el: NODE,
+		newChildren: VNode<NODE, PROPS>[],
+		oldChildren: VNode<NODE, PROPS>[],
+		anchor?: NODE | null
+	) {
+		for (let i = 0, l = newChildren.length; i < l; i++) {
+			this.patchIf(el, newChildren[i], oldChildren[i], anchor)
+		}
+	}
+
+	/**
+	 * 全量 diff - children 补丁（递归深度diff，消耗性能）
+	 *
+	 * @param el
+	 * @param newVNode
+	 * @param oldVNode
+	 */
+	patchKeyedChildren(el: NODE, newVNodes: VNode<NODE, PROPS>[], oldVNodes: VNode<NODE, PROPS>[]) {
 		// 双端比较
 		let i = 0
 		let newEnd = newVNodes.length - 1
@@ -284,7 +417,7 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 			const oldVNode = oldVNodes[i]
 			if (this.isSameNode(newVNode, oldVNode)) {
 				// 节点相同则复用
-				this.patch(newVNode, oldVNode, void 0, parentComponent)
+				this.patch(newVNode, oldVNode)
 				i++
 			} else {
 				break
@@ -300,7 +433,7 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 			const oldVNode = oldVNodes[oldEnd]
 			if (this.isSameNode(newVNode, oldVNode)) {
 				// 节点相同则重新挂载元素
-				this.patch(newVNode, oldVNode, void 0, parentComponent)
+				this.patch(newVNode, oldVNode)
 				newEnd--
 				oldEnd--
 			} else {
@@ -318,7 +451,7 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 			if (i <= newEnd) {
 				const anchor = newVNodes[newEnd + 1]?.el as NODE
 				while (i <= newEnd) {
-					this.mount(container, newVNodes[i], anchor, component)
+					this.mount(el, newVNodes[i], anchor)
 					i++
 				}
 			}
@@ -367,7 +500,7 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 						moved = true
 					}
 					// 老的有，新的也有，则复用
-					this.patch(newVNodes[newIndex], oldVNode, void 0, component)
+					this.patch(newVNodes[newIndex], oldVNode)
 				}
 				oldStart++
 			}
@@ -384,89 +517,16 @@ export class Renderer<NODE, ELEM extends NODE, PROPS extends VNodeProps> {
 						seq--
 					} else {
 						// 有元素则移动
-						this._options.insert(newVNode.el, container, anchor)
+						this._options.insert(newVNode.el, el, anchor)
 					}
 				} else {
 					// 没元素则挂载
-					this.mount(container, newVNode, anchor, component)
+					this.mount(el, newVNode, anchor, component)
 				}
 				newEnd--
 			}
 		}
 
 		//#endregion mount 和 unmount
-	}
-
-	/**
-	 * children 补丁
-	 *
-	 * @param newVNode
-	 * @param oldVNode
-	 * @returns
-	 */
-	patchChildren(
-		container: NODE,
-		newVNode: VNode<NODE, PROPS>,
-		oldVNode: VNode<NODE, PROPS>,
-		anchor?: NODE | null,
-		component?: VNodeComponentInstance<NODE, PROPS> | null,
-		parentComponent?: VNodeComponentInstance<NODE, PROPS> | null
-	) {
-		const { shapeFlag: newShapeFlag, children: newChildren } = newVNode
-		const { shapeFlag: oldShapeFlag, children: oldChildren } = oldVNode
-
-		// shapeFlag 与 children 一样
-		if (newShapeFlag === oldShapeFlag && isSameObject(newChildren, oldChildren)) {
-			return
-		}
-
-		const ops = this._options
-
-		if (newShapeFlag & ShapeFlags.TEXT_CHILDREN) {
-			// 新的是文本
-
-			if (oldShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-				// 新的是文本，老的是数组，卸载老的
-				this.unmountChildren(oldChildren as VNode<NODE, PROPS>[])
-			}
-
-			if (newChildren !== oldChildren) {
-				// 新的是文本，设置文本
-				ops.setElementText(container, newChildren as string)
-			}
-		} else if (oldShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-			// 老的是数组，新的是数组或空
-
-			if (newShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-				// 老的是数组，新的是数组，全量 diff 算法
-				this.patchKeyedChildren(
-					container,
-					newChildren as VNode<NODE, PROPS>[],
-					oldChildren as VNode<NODE, PROPS>[],
-					component,
-					parentComponent
-				)
-				// 无 diff 算法
-				// 卸载老的
-				// this.unmountChildren(oldChildren as VNode<NODE, PROPS>[])
-				// 挂载新的
-				// this.mountChildren(el, newChildren as VNode<NODE, PROPS>[])
-			} else {
-				// 老的是数组，新的是空，卸载老的
-				this.unmountChildren(oldChildren as VNode<NODE, PROPS>[])
-			}
-		} else {
-			// 老的是文本或空，新的是数组或空
-
-			if (oldShapeFlag & ShapeFlags.TEXT_CHILDREN) {
-				// 老的是文本，新的是数组或空，清空文本
-				ops.setElementText(container, '')
-			}
-
-			if (newShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-				// 新的是数组，挂载新的
-				this.mountChildren(container, newChildren as VNode<NODE, PROPS>[], anchor, component)
-			}
-		}
 	}
 }

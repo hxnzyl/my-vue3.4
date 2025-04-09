@@ -19,20 +19,18 @@ export const isOn = (val: any) => val && val.substring(0, 2) === 'on'
 
 export const hasOwn = (val: any, key: PropertyKey) => isObject(val) && hasOwnProperty.call(val, key)
 
-/**
- * 判断对象是否相同
- *
- * @param target
- * @param destination
- * @returns
- */
+export function isIterable(val: any) {
+	return val != null && typeof val[Symbol.iterator] === 'function'
+}
+
 export function isSameObject(target: any, destination: any) {
-	if (target !== destination && destination != null && target != null) {
+	const eq = target === destination
+	if (!eq && isIterable(target) && isIterable(destination)) {
 		for (const key in target) {
 			if (destination[key] !== target[key]) {
 				return false
 			}
 		}
 	}
-	return true
+	return eq
 }
