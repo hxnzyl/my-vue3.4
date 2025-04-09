@@ -1,0 +1,19 @@
+{
+	"name": "@vue3/runtime-core",
+	"version": "0.0.1",
+	"module": "dist/runtime-core.esm-builder.js",
+	"unpkg": "dist/runtime-core.global.js",
+	"buildOptions": {
+		"name": "Vue3RuntimeCore",
+		"formats": [
+			"esm-bundler",
+			"esm-browser",
+			"cjs",
+			"global"
+		]
+	},
+	"dependencies": {
+		"@vue3/reactivity": "workspace:*",
+		"@vue3/shared": "workspace:^"
+	}
+}

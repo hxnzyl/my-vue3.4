@@ -1,0 +1,18 @@
+{
+	"name": "@vue3/runtime-dom",
+	"version": "0.0.1",
+	"module": "dist/runtime-dom.esm-builder.js",
+	"unpkg": "dist/runtime-dom.global.js",
+	"buildOptions": {
+		"name": "Vue3RuntimeDom",
+		"formats": [
+			"esm-bundler",
+			"esm-browser",
+			"cjs",
+			"global"
+		]
+	},
+	"dependencies": {
+		"@vue3/runtime-core": "workspace:*"
+	}
+}

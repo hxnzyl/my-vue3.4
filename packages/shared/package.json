@@ -1,0 +1,15 @@
+{
+	"name": "@vue3/shared",
+	"version": "0.0.1",
+	"module": "dist/shared.esm-builder.js",
+	"unpkg": "dist/shared.global.js",
+	"buildOptions": {
+		"name": "Vue3Shared",
+		"formats": [
+			"esm-bundler",
+			"esm-browser",
+			"cjs",
+			"global"
+		]
+	}
+}

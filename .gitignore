@@ -1,0 +1,26 @@
+# System
+.DS_Store
+
+# Npm
+node_modules
+dist
+
+# local env files
+*.local*
+
+# Log files
+*.log*
+
+# Lock files
+*-lock.json
+*-lock.yaml
+
+# Editor directories and files
+.idea
+.vscode
+.history
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
