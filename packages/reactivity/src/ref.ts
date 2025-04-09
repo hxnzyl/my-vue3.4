@@ -129,7 +129,7 @@ class RefImpl<T extends object> implements Ref<T, any> {
 	 */
 	public set value(newValue: any) {
 		// Object.is 更加严格，比如: NaN与NaN为true，+0与-0为false
-		if (Object.is(this._rawValue, newValue)) {
+		if (this._value === newValue || Object.is(this._rawValue, newValue)) {
 			return
 		}
 

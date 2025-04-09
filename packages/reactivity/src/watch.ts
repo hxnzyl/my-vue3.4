@@ -73,7 +73,7 @@ export function watchEffect<T extends object>(getter: WatchGetter<T>, options?: 
 	)
 }
 
-class WatchEffect<T> {
+class WatchEffect<T extends object> {
 	private _oldValue?: T
 	private _newValue?: T
 	private _effect: ReactiveEffect

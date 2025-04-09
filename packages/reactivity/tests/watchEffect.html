@@ -1,0 +1,40 @@
+<html !DOCTYPE>
+	<head></head>
+	<body>
+		<div id="app">
+			<div id="eRev"></div>
+			<div id="eRef"></div>
+			<div id="eRec"></div>
+			<div id="eCom"></div>
+			<button id="eBtn">Btn</button>
+		</div>
+		<script type="module">
+			import { ref, watchEffect } from '/node_modules/@vue3/reactivity/dist/reactivity.esm-browser.js'
+
+			// 定义简单类型的响应式变量
+			const refVar = ref({ deep: { n2: 2, n3: { n4: 4 } } })
+
+			// 定义监控
+			watchEffect(
+				() => {
+					console.log('触发了 watchEffect', refVar.value)
+				},
+				{
+					// immediate: true
+					deep: true,
+					depth: 2
+				}
+			)
+
+			setTimeout(() => {
+				// refVar.value = refVar.value
+				refVar.value.deep.n3.n4 += 1
+			}, 1000)
+
+			eBtn.onclick = () => {
+				// refVar.value.name = Math.random()
+				refVar.value = { ...refVar.value, name: Math.random() }
+			}
+		</script>
+	</body>
+</html>
