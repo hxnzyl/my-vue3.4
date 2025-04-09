@@ -1,0 +1,41 @@
+<html !DOCTYPE>
+	<head></head>
+	<body>
+		<div id="app">
+			<div id="eRender"></div>
+			<button id="eAge">Age++</button>
+		</div>
+		<script type="module">
+			import { h, render } from '/node_modules/@vue3/runtime-dom/dist/runtime-dom.esm-browser.js'
+
+			const VueComponent = h({
+				data() {
+					return {
+						name: '朱勇龙',
+						age: 35
+					}
+				},
+				methods: {
+					incrAge() {
+						this.age++
+						this.age++
+					}
+				},
+				render() {
+					console.log(1111)
+					return h('div', { key: 'div' }, [
+						h('div', { key: 'name' }, 'name: ' + this.name),
+						h('div', { key: 'age' }, 'age: ' + this.age)
+					])
+				}
+			})
+
+			render(VueComponent, eRender)
+
+			eAge.onclick = () => {
+				// console.log(VueComponent)
+				VueComponent.component.proxy.incrAge()
+			}
+		</script>
+	</body>
+</html>

@@ -1,0 +1,39 @@
+<html !DOCTYPE>
+	<head></head>
+	<body>
+		<div id="app">
+			<div id="eRev"></div>
+			<div id="eRef"></div>
+			<div id="eRec"></div>
+			<div id="eCom"></div>
+			<button id="eBtn">Age Incr</button>
+		</div>
+		<script type="module">
+			import {
+				ref,
+				toRef,
+				toRefs,
+				proxyRefs,
+				reactive,
+				computed,
+				effect
+			} from '/node_modules/@vue3/reactivity/dist/reactivity.esm-browser.js'
+
+			// 定义简单类型的响应式变量
+			const refVar = ref({ name: '妮妮', age: 18, flag: false })
+			console.log('ref', refVar)
+
+			// 定义计算属性
+			const comVar = computed((oldValue) => {
+				console.log('触发了 computed', oldValue)
+				return refVar.value.name
+			})
+			console.log('computed', comVar)
+
+			eBtn.onclick = () => {
+				comVar.value
+				refVar.value.name = Math.random()
+			}
+		</script>
+	</body>
+</html>

@@ -1,0 +1,66 @@
+<html !DOCTYPE>
+	<head></head>
+	<body>
+		<div id="app">
+			<div id="eRev"></div>
+			<div id="eRef"></div>
+			<div id="eRec"></div>
+			<div id="eCom"></div>
+			<button id="eBtn">Age Incr</button>
+		</div>
+		<script type="module">
+			import {
+				ref,
+				toRef,
+				toRefs,
+				proxyRefs,
+				reactive,
+				computed,
+				effect
+			} from '/node_modules/@vue3/reactivity/dist/reactivity.esm-browser.js'
+
+			// 定义复杂类型的响应式变量
+			const revVar = reactive({ name: '龙龙', age: 35, flag: false })
+			console.log('reactive', revVar)
+
+			// 定义简单类型的响应式变量
+			const refVar = ref({ name: '妮妮', age: 18, flag: false })
+			console.log('ref', refVar)
+
+			// 默认会先执行一次，数据变化后会再次执行
+			effect(function effectReactive() {
+				// 一个effect中，某个属性被多次get时，需要确保只收集一次依赖
+				console.log('触发了 effectReactive')
+				revVar.flag
+				eRev.innerHTML = revVar.flag ? `reactive name: ${revVar.name}` : `reactive age: ${revVar.age}`
+			})
+
+			effect(function effectRef() {
+				console.log('触发了 effectRef')
+				refVar.value.flag
+				eRef.innerHTML = refVar.value.flag ? `ref name: ${refVar.value.name}` : `ref age: ${refVar.value.age}`
+			})
+
+			// 读取一次，设置一次时防止递归
+			effect(function effectRecursive() {
+				console.log('触发了 effectRecursive')
+				refVar.value.flag
+				eRec.innerHTML = revVar.name
+				revVar.name = Math.random()
+			})
+
+			const _toRef = toRef(revVar, 'name')
+			const _toRefs = toRefs(revVar)
+			const _proxyRefs = proxyRefs(_toRefs)
+
+			eBtn.onclick = () => {
+				console.log('nameRef', _toRef)
+				console.log('refs', _toRefs)
+				console.log('proxyRefs', _proxyRefs.name)
+
+				revVar.flag = !revVar.flag
+				refVar.value.flag = !refVar.value.flag
+			}
+		</script>
+	</body>
+</html>

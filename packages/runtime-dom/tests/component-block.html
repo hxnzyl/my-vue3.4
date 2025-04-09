@@ -1,0 +1,46 @@
+<html !DOCTYPE>
+	<head></head>
+	<body>
+		<div id="app">
+			<div id="eRender"></div>
+			<button id="eAge">Age++</button>
+		</div>
+		<script type="module">
+			// 自己的
+			import {
+				h,
+				render,
+				VNodeFlags,
+				_openBlock,
+				_createElementBlock,
+				_createElementVNode
+			} from '/node_modules/@vue3/runtime-dom/dist/runtime-dom.esm-browser.js'
+
+			const PatchFlagComponent = h({
+				data() {
+					return {
+						age: 35
+					}
+				},
+				methods: {
+					incrAge() {
+						this.age++
+					}
+				},
+				render() {
+					return (
+						_openBlock(),
+						_createElementBlock(VNodeFlags.Fragment, null, [
+							_createElementVNode('div', null, 'Hello World'),
+							_createElementVNode('span', null, this.age, 1 /* TEXT */)
+						])
+					)
+				}
+			})
+
+			render(PatchFlagComponent, eRender)
+
+			eAge.onclick = () => PatchFlagComponent.component.proxy.incrAge()
+		</script>
+	</body>
+</html>

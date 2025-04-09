@@ -1,0 +1,60 @@
+<html !DOCTYPE>
+	<head></head>
+	<body>
+		<div id="app">
+			<div id="eRender"></div>
+		</div>
+		<script type="module">
+			import { h, render } from '/node_modules/@vue3/runtime-dom/dist/runtime-dom.esm-browser.js'
+
+			const RenderComponent = {
+				props: {
+					count: Number
+				},
+				render() {
+					console.log('##child', this)
+					return h('div', {}, [
+						this.$slots.header(),
+						h('button', { onClick: () => this.$emit('click', this) }, 'count: ' + this.count),
+						this.$slots.footer()
+					])
+				}
+			}
+
+			const VueComponent = h({
+				data() {
+					return {
+						count: 0
+					}
+				},
+				methods: {
+					incr() {
+						this.count++
+					}
+				},
+				render() {
+					console.log('##parent', this)
+					return h('div', { key: 'div', style: { height: '100px', background: '#222', color: '#fff' } }, [
+						h(
+							RenderComponent,
+							{ count: this.count, onClick: (child) => child.count++ },
+							{
+								header: () => h('header', null, 'header'),
+								footer: () => h('footer', null, 'footer')
+							}
+						),
+						h(
+							'button',
+							{
+								onClick: this.incr
+							},
+							'incr'
+						)
+					])
+				}
+			})
+
+			render(VueComponent, eRender)
+		</script>
+	</body>
+</html>

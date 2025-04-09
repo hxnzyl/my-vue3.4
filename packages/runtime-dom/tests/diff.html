@@ -1,0 +1,39 @@
+<html !DOCTYPE>
+	<head></head>
+	<body>
+		<div id="app">
+			<div id="eRender"></div>
+			<button id="eRnd">Rand</button>
+		</div>
+		<script type="module">
+			import { h, render } from '/node_modules/@vue3/runtime-dom/dist/runtime-dom.esm-browser.js'
+
+			const e1 = h('div', {}, [
+				h('div', { key: 'a' }, 'a'),
+				h('div', { key: 'b' }, 'b'),
+				h('div', { key: 'c' }, 'c'),
+				h('div', { key: 'd' }, 'd'),
+				h('div', { key: 'e' }, 'e'),
+				h('div', { key: 'f' }, 'f'),
+				h('div', { key: 'g' }, 'g')
+			])
+
+			const e2 = h('div', {}, [
+				h('div', { key: 'a' }, 'a'),
+				h('div', { key: 'b' }, 'b'),
+				h('div', { key: 'e' }, 'e'),
+				h('div', { key: 'c' }, 'c'),
+				h('div', { key: 'd' }, 'd'),
+				h('div', { key: 'h' }, 'h'),
+				h('div', { key: 'f' }, 'f'),
+				h('div', { key: 'g' }, 'g')
+			])
+
+			render(e1, eRender)
+
+			eRnd.onclick = () => {
+				render(e2, eRender)
+			}
+		</script>
+	</body>
+</html>
